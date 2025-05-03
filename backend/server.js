@@ -1,4 +1,3 @@
-// Backend Structure (server.js)
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
@@ -136,8 +135,136 @@ async function initDatabase() {
         (2, 'Jane Smith', 'Female', 28, '2021-03-10', 'Cashier', '0987654321', 35000);
     `);
     
+    // Create SQL function for getting employee salary
+    await connection.query(`
+      DROP FUNCTION IF EXISTS get_employee_salary;
+    `);
+    await connection.query(`
+      CREATE FUNCTION get_employee_salary(empId INT) 
+      RETURNS DECIMAL(10,2)
+      DETERMINISTIC
+      READS SQL DATA
+      BEGIN
+        DECLARE empSalary DECIMAL(10,2);
+        SELECT Salary INTO empSalary FROM Employee WHERE Emp_ID = empId;
+        RETURN empSalary;
+      END;
+    `);
+
+    // Create trigger for expired stock
+    await connection.query(`
+      DROP TRIGGER IF EXISTS dispose_expired_stock;
+    `);
+    await connection.query(`
+      CREATE TRIGGER dispose_expired_stock
+      AFTER UPDATE ON Stock
+      FOR EACH ROW
+      BEGIN
+        IF NEW.Exp_date < CURRENT_DATE() THEN
+          INSERT INTO Disposal (Med_ID, Quantity)
+          VALUES (NEW.Med_ID, NEW.Quantity);
+        END IF;
+      END;
+    `);
+
+    // Create stored procedure for order placement
+    await connection.query(`
+      DROP PROCEDURE IF EXISTS place_order_full;
+    `);
+    await connection.query(`
+      CREATE PROCEDURE place_order_full (
+        IN p_name VARCHAR(100),
+        IN p_gender ENUM('Male', 'Female', 'Other'),
+        IN p_age INT,
+        IN p_address TEXT,
+        IN p_phone VARCHAR(15),
+        IN p_employeeId INT,
+        IN p_orderItems JSON
+      )
+      BEGIN
+        DECLARE v_customerId INT;
+        DECLARE v_totalAmount DECIMAL(10,2) DEFAULT 0.0;
+        DECLARE v_billNo INT;
+        DECLARE v_medId INT;
+        DECLARE v_quantity INT;
+        DECLARE v_price DECIMAL(10,2);
+        DECLARE v_stock INT;
+        DECLARE done INT DEFAULT FALSE;
+        DECLARE cur CURSOR FOR 
+          SELECT JSON_UNQUOTE(JSON_EXTRACT(item, '$.Med_ID')),
+                 JSON_UNQUOTE(JSON_EXTRACT(item, '$.Quantity'))
+          FROM JSON_TABLE(p_orderItems, "$[*]"
+            COLUMNS (
+              item JSON PATH "$"
+            )
+          ) AS items;
+        DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+
+        START TRANSACTION;
+        
+        -- Check if customer already exists
+        SELECT Cust_ID INTO v_customerId FROM Customer WHERE Phone = p_phone LIMIT 1;
+        
+        IF v_customerId IS NULL THEN
+          INSERT INTO Customer (Name, Gender, Age, Address, Phone)
+          VALUES (p_name, p_gender, p_age, p_address, p_phone);
+          SET v_customerId = LAST_INSERT_ID();
+        END IF;
+        
+        -- Create bill first (will update amount later)
+        INSERT INTO Bill (Cust_ID, Total_amount, Emp_ID)
+        VALUES (v_customerId, 0.00, p_employeeId);
+        
+        SET v_billNo = LAST_INSERT_ID();
+
+        -- Loop through order items
+        OPEN cur;
+        read_loop: LOOP
+          FETCH cur INTO v_medId, v_quantity;
+          IF done THEN
+            LEAVE read_loop;
+          END IF;
+          
+          -- Get medicine price
+          SELECT cost_price INTO v_price FROM Medicine WHERE Med_ID = v_medId;
+          
+          IF v_price IS NULL THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Medicine not found';
+          END IF;
+          
+          -- Check stock
+          SELECT Quantity INTO v_stock FROM Stock WHERE Med_ID = v_medId;
+          
+          IF v_stock IS NULL OR v_stock < v_quantity THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Insufficient stock';
+          END IF;
+          
+          -- Insert into Bill_details
+          INSERT INTO Bill_details (Bill_no, Med_ID, Quantity)
+          VALUES (v_billNo, v_medId, v_quantity);
+          
+          -- Update stock
+          UPDATE Stock
+          SET Quantity = Quantity - v_quantity
+          WHERE Med_ID = v_medId;
+          
+          -- Add to total amount
+          SET v_totalAmount = v_totalAmount + (v_price * v_quantity);
+        END LOOP;
+        
+        CLOSE cur;
+        
+        -- Update bill with total amount
+        UPDATE Bill
+        SET Total_amount = v_totalAmount
+        WHERE Bill_no = v_billNo;
+        
+        COMMIT;
+      END;
+    `);
+    
     connection.release();
-    console.log('Database initialized successfully');
+    console.log('Database initialized with functions, triggers, and procedures');
   } catch (error) {
     console.error('Error initializing database:', error);
   }
@@ -201,6 +328,24 @@ app.get('/api/medicines/:medId', async (req, res) => {
   }
 });
 
+// Get salary of an employee
+app.get('/api/employee/:empId/salary', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT get_employee_salary(?) AS Salary
+    `, [req.params.empId]);
+
+    if (rows.length === 0 || rows[0].Salary === null) {
+      return res.status(404).json({ error: 'Employee not found or salary missing' });
+    }
+
+    res.json({ salary: rows[0].Salary });
+  } catch (error) {
+    console.error('Error fetching employee salary:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Create new order
 app.post('/api/orders', async (req, res) => {
   const connection = await pool.getConnection();
@@ -208,95 +353,25 @@ app.post('/api/orders', async (req, res) => {
     await connection.beginTransaction();
     
     const { customerDetails, orderItems, employeeId } = req.body;
-    
-    // Insert or update customer
-    let customerId;
-    if (customerDetails.Cust_ID) {
-      // Update existing customer
-      customerId = customerDetails.Cust_ID;
-      await connection.query(`
-        UPDATE Customer
-        SET Name = ?, Gender = ?, Age = ?, Address = ?, Phone = ?
-        WHERE Cust_ID = ?
-      `, [
-        customerDetails.Name, 
-        customerDetails.Gender, 
-        customerDetails.Age, 
-        customerDetails.Address, 
-        customerDetails.Phone,
-        customerId
-      ]);
-    } else {
-      // Insert new customer
-      const [customerResult] = await connection.query(`
-        INSERT INTO Customer (Name, Gender, Age, Address, Phone)
-        VALUES (?, ?, ?, ?, ?)
-      `, [
-        customerDetails.Name, 
-        customerDetails.Gender, 
-        customerDetails.Age, 
-        customerDetails.Address, 
-        customerDetails.Phone
-      ]);
-      customerId = customerResult.insertId;
-    }
-    
-    // Calculate total amount
-    let totalAmount = 0;
-    for (const item of orderItems) {
-      const [priceRows] = await connection.query(`
-        SELECT cost_price FROM Medicine WHERE Med_ID = ?
-      `, [item.Med_ID]);
-      
-      if (priceRows.length === 0) {
-        throw new Error(`Medicine with ID ${item.Med_ID} not found`);
-      }
-      
-      totalAmount += priceRows[0].cost_price * item.Quantity;
-      
-      // Check stock availability
-      const [stockRows] = await connection.query(`
-        SELECT Quantity FROM Stock WHERE Med_ID = ?
-      `, [item.Med_ID]);
-      
-      if (stockRows.length === 0 || stockRows[0].Quantity < item.Quantity) {
-        throw new Error(`Insufficient stock for medicine ID ${item.Med_ID}`);
-      }
-    }
-    
-    // Create bill
-    const [billResult] = await connection.query(`
-      INSERT INTO Bill (Cust_ID, Total_amount, Emp_ID)
-      VALUES (?, ?, ?)
-    `, [customerId, totalAmount, employeeId]);
-    
-    const billNo = billResult.insertId;
-    
-    // Create bill details and update stock
-    for (const item of orderItems) {
-      await connection.query(`
-        INSERT INTO Bill_details (Bill_no, Med_ID, Quantity)
-        VALUES (?, ?, ?)
-      `, [billNo, item.Med_ID, item.Quantity]);
-      
-      await connection.query(`
-        UPDATE Stock
-        SET Quantity = Quantity - ?
-        WHERE Med_ID = ?
-      `, [item.Quantity, item.Med_ID]);
-    }
-    
+
+    await connection.query(`
+      CALL place_order_full(?, ?, ?, ?, ?, ?, ?)
+    `, [
+      customerDetails.Name,
+      customerDetails.Gender,
+      customerDetails.Age,
+      customerDetails.Address,
+      customerDetails.Phone,
+      employeeId,
+      JSON.stringify(orderItems) // pass orderItems as JSON
+    ]);
+
     await connection.commit();
-    
-    res.status(201).json({
-      message: 'Order created successfully',
-      billNo,
-      customerId,
-      totalAmount
-    });
+    res.status(201).json({ message: 'Order placed successfully' });
+
   } catch (error) {
     await connection.rollback();
-    console.error('Error creating order:', error);
+    console.error('Error placing order:', error);
     res.status(500).json({ error: error.message || 'Server error' });
   } finally {
     connection.release();
