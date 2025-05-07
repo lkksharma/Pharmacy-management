@@ -835,6 +835,23 @@ app.get("/api/employees/:empId", async (req, res) => {
   }
 });
 
+// Get all employees with phone numbers
+app.get("/api/employees", async (req, res) => {
+  try {
+    const [employees] = await pool.query(`
+      SELECT e.Emp_ID, e.Emp_Name, e.Gender, e.Age, e.Start_Date, e.Role, e.Salary,
+             GROUP_CONCAT(ep.Emp_phone) as Phone_Numbers
+      FROM Employee e
+      LEFT JOIN Emp_Phone ep ON e.Emp_ID = ep.Emp_ID
+      GROUP BY e.Emp_ID
+    `);
+    res.json(employees);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // Server start
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
