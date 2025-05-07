@@ -18,8 +18,11 @@ function Header() {
           <Link to="/order" style={{ color: 'white', marginRight: '15px', textDecoration: 'none' }}>
             Place Order
           </Link>
-          <Link to="/inventory" style={{ color: 'white', textDecoration: 'none' }}>
+          <Link to="/inventory" style={{ color: 'white', marginRight: '15px', textDecoration: 'none' }}>
             Inventory Management
+          </Link>
+          <Link to="/appraisal" style={{ color: 'white', textDecoration: 'none' }}>
+            Appraisal
           </Link>
         </nav>
       </div>

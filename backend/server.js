@@ -348,103 +348,41 @@ app.post("/api/medicines", async (req, res) => {
 app.post("/api/createOrder", async (req, res) => {
   const { customerDetails, orderItems, employeeId } = req.body;
   const connection = await pool.getConnection();
-  
+
   try {
     await connection.beginTransaction();
-    
-    // Check if customer exists by phone number
-    const [existingCustomer] = await connection.query(
-      "SELECT Cust_ID FROM Customer WHERE Phone = ?",
-      [customerDetails.Phone]
-    );
-    
-    let customerId;
-    
-    if (existingCustomer.length > 0) {
-      // Use existing customer
-      customerId = existingCustomer[0].Cust_ID;
-    } else {
-      // Create new customer - split Address into Area and City
-      const addressParts = customerDetails.Address ? customerDetails.Address.split(',') : ['', ''];
-      const area = addressParts[0]?.trim() || '';
-      const city = addressParts.length > 1 ? addressParts[1].trim() : '';
-      
-      const [result] = await connection.query(
-        "INSERT INTO Customer (Name, Gender, Age, Area, City, Phone) VALUES (?, ?, ?, ?, ?, ?)",
-        [customerDetails.Name, customerDetails.Gender, customerDetails.Age, area, city, customerDetails.Phone]
-      );
-      
-      customerId = result.insertId;
-    }
-    
-    // Create bill
-    const [billResult] = await connection.query(
-      "INSERT INTO Bill (Cust_ID, Total_amount, Emp_ID) VALUES (?, 0, ?)",
-      [customerId, employeeId]
-    );
-    
-    const billNo = billResult.insertId;
-    
-    // Add bill details and calculate total
-    let totalAmount = 0;
-    
-    for (const item of orderItems) {
-      // Get medicine price
-      const [medicineResult] = await connection.query(
-        "SELECT cost_price FROM Medicine WHERE Med_ID = ?",
-        [item.Med_ID]
-      );
-      
-      if (medicineResult.length === 0) {
-        throw new Error(`Medicine with ID ${item.Med_ID} not found`);
-      }
-      
-      const price = medicineResult[0].cost_price;
-      
-      // Check stock
-      const [stockResult] = await connection.query(
-        "SELECT Quantity FROM Stock WHERE Med_ID = ?",
-        [item.Med_ID]
-      );
-      
-      if (stockResult.length === 0 || stockResult[0].Quantity < item.Quantity) {
-        throw new Error(`Insufficient stock for medicine with ID ${item.Med_ID}`);
-      }
-      
-      // Add to bill details
-      await connection.query(
-        "INSERT INTO Bill_details (Bill_no, Med_ID, Quantity) VALUES (?, ?, ?)",
-        [billNo, item.Med_ID, item.Quantity]
-      );
-      
-      // Update stock
-      await connection.query(
-        "UPDATE Stock SET Quantity = Quantity - ? WHERE Med_ID = ?",
-        [item.Quantity, item.Med_ID]
-      );
-      
-      // Calculate subtotal
-      const subtotal = price * item.Quantity;
-      totalAmount += subtotal;
-    }
-    
-    // Update bill with total amount
+
+    // Split address
+    const addressParts = customerDetails.Address ? customerDetails.Address.split(',') : ['', ''];
+    const area = addressParts[0]?.trim() || '';
+    const city = addressParts.length > 1 ? addressParts[1].trim() : '';
+
+    // Call the stored procedure
     await connection.query(
-      "UPDATE Bill SET Total_amount = ? WHERE Bill_no = ?",
-      [totalAmount, billNo]
+      `CALL place_order_full(?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        customerDetails.Name,
+        customerDetails.Gender,
+        customerDetails.Age,
+        area,
+        city,
+        customerDetails.Phone,
+        employeeId,
+        JSON.stringify(orderItems)
+      ]
     );
-    
+
     await connection.commit();
-    res.status(200).json({ billNo });
-    
+    res.status(200).json({ message: "Order placed successfully" });
   } catch (error) {
     await connection.rollback();
-    console.error("Order creation failed:", error);
-    res.status(500).json({ error: error.message || "Order creation failed" });
+    console.error(error);
+    res.status(500).json({ error: error.message });
   } finally {
     connection.release();
   }
 });
+
 
 // Get all employees with their phones
 app.get("/api/employees", async (req, res) => {
