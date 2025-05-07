@@ -345,7 +345,7 @@ app.post("/api/medicines", async (req, res) => {
 });
 
 // Place order
-app.post("/api/create-order", async (req, res) => {
+app.post("/api/createOrder", async (req, res) => {
   const { customerDetails, orderItems, employeeId } = req.body;
   const connection = await pool.getConnection();
   

@@ -19,7 +19,7 @@ export const api = {
   getAllCustomers: () => axios.get(`${baseURL}/customers`),
   
   // Order-related endpoints
-  createOrder: (orderData) => axios.post(`${baseURL}/create-order`, orderData),
+  createOrder: (orderData) => axios.post(`${baseURL}/createOrder`, orderData),
   
   // Bill-related endpoints
   getAllBills: () => axios.get(`${baseURL}/bills`),
