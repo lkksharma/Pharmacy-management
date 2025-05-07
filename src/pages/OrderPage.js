@@ -20,22 +20,23 @@ function OrderPage() {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(false);
   
+  // Function to load all medicines (used for initial load and refreshing)
+  const loadMedicines = async () => {
+    try {
+      const response = await api.getAllMedicines();
+      setMedicines(response.data);
+    } catch (error) {
+      console.error('Error fetching medicines:', error);
+      setMessage({ 
+        text: 'Failed to load medicines. Please try again later.',
+        type: 'danger'
+      });
+    }
+  };
+
   useEffect(() => {
-    // Fetch available medicines
-    const fetchMedicines = async () => {
-      try {
-        const response = await api.getAllMedicines();
-        setMedicines(response.data);
-      } catch (error) {
-        console.error('Error fetching medicines:', error);
-        setMessage({ 
-          text: 'Failed to load medicines. Please try again later.',
-          type: 'danger'
-        });
-      }
-    };
-    
-    fetchMedicines();
+    // Fetch available medicines on component mount
+    loadMedicines();
   }, []);
   
   const handleCustomerChange = (e) => {
@@ -60,12 +61,12 @@ function OrderPage() {
       }
       
       // Check if medicine is already in the order
-      if (selectedMedicines.some(med => med.Med_ID === selectedMedicine.Med_ID)) {
+      if (selectedMedicines.some(med => med.Med_ID === parseInt(selectedMedicine.Med_ID))) {
         setMessage({ text: 'This medicine is already in your order', type: 'warning' });
         return;
       }
       
-      // Check availability
+      // Check availability from server (to get most up-to-date stock)
       const response = await api.checkMedicineAvailability(selectedMedicine.Med_ID);
       const medicineData = response.data;
       
@@ -77,8 +78,29 @@ function OrderPage() {
         return;
       }
       
-      // Add medicine details to order
+      // Find the medicine details from our medicines array
       const selectedMed = medicines.find(med => med.Med_ID === parseInt(selectedMedicine.Med_ID));
+      if (!selectedMed) {
+        setMessage({ text: 'Medicine not found', type: 'danger' });
+        return;
+      }
+      
+      // Create a temporary updated medicines array with reduced stock
+      const updatedMedicines = medicines.map(med => {
+        if (med.Med_ID === parseInt(selectedMedicine.Med_ID)) {
+          // Create a new object with updated quantity (for UI purposes only)
+          return {
+            ...med,
+            Quantity: med.Quantity - parseInt(selectedMedicine.Quantity)
+          };
+        }
+        return med;
+      });
+      
+      // Update the medicines state to reflect the reduced stock
+      setMedicines(updatedMedicines);
+      
+      // Add medicine to selected medicines
       setSelectedMedicines([
         ...selectedMedicines, 
         {
@@ -100,8 +122,26 @@ function OrderPage() {
   };
   
   const removeMedicineFromOrder = (medId) => {
-    setSelectedMedicines(selectedMedicines.filter(med => med.Med_ID !== medId));
-    setMessage({ text: 'Medicine removed from order', type: 'success' });
+    // Get the medicine being removed
+    const removedMedicine = selectedMedicines.find(med => med.Med_ID === medId);
+    
+    if (removedMedicine) {
+      // Update the medicines array to add back the quantity
+      const updatedMedicines = medicines.map(med => {
+        if (med.Med_ID === medId) {
+          return {
+            ...med,
+            Quantity: med.Quantity + removedMedicine.Quantity
+          };
+        }
+        return med;
+      });
+      
+      // Update the state
+      setMedicines(updatedMedicines);
+      setSelectedMedicines(selectedMedicines.filter(med => med.Med_ID !== medId));
+      setMessage({ text: 'Medicine removed from order', type: 'success' });
+    }
   };
   
   const calculateTotal = () => {
@@ -125,13 +165,19 @@ function OrderPage() {
     try {
       setLoading(true);
       
+      const addressParts = customer.Address ? customer.Address.split(',') : ['', ''];
+      const area = addressParts[0]?.trim() || '';
+      const city = addressParts.length > 1 ? addressParts[1].trim() : '';
+      
       const orderData = {
-        customerDetails: customer,
+        customerDetails: {
+          ...customer,
+        },
         orderItems: selectedMedicines.map(med => ({
           Med_ID: med.Med_ID,
           Quantity: med.Quantity
         })),
-        employeeId: 1 // Default employee ID
+        employeeId: 1
       };
       
       const response = await api.createOrder(orderData);
@@ -150,6 +196,9 @@ function OrderPage() {
         Phone: ''
       });
       setSelectedMedicines([]);
+      
+      // Refresh medicines list to get updated stock quantities from server
+      loadMedicines();
       
     } catch (error) {
       console.error('Error submitting order:', error);
@@ -212,13 +261,17 @@ function OrderPage() {
         </div>
         
         <div className="form-group">
-          <label>Address</label>
+          <label>Address (Format: Area, City)</label>
           <textarea
             name="Address"
             className="form-control"
             value={customer.Address}
             onChange={handleCustomerChange}
+            placeholder="Enter area, city"
           ></textarea>
+          <small className="form-text text-muted">
+            Please enter in format: Area, City (e.g. "Downtown, New York")
+          </small>
         </div>
         
         <div className="form-group">
