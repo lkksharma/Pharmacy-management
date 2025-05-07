@@ -305,18 +305,6 @@ app.get("/api/medicines/:medId", async (req, res) => {
   }
 });
 
-// Get salary of an employee
-app.get("/api/employee/:empId/salary", async (req, res) => {
-  try {
-    const [rows] = await pool.query(`SELECT get_employee_salary(?) AS salary`, [req.params.empId]);
-    if (rows.length === 0 || rows[0].salary === null)
-      return res.status(404).json({ error: "Employee not found or salary missing" });
-    res.json({ salary: rows[0].salary });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
 
 // Add new medicine
 app.post("/api/medicines", async (req, res) => {
@@ -384,22 +372,6 @@ app.post("/api/createOrder", async (req, res) => {
 });
 
 
-// Get all employees with their phones
-app.get("/api/employees", async (req, res) => {
-  try {
-    const [rows] = await pool.query(`
-      SELECT e.Emp_ID, e.Emp_Name, e.Gender, e.Age, e.Start_Date, e.Role, e.Salary,
-             GROUP_CONCAT(p.Emp_phone) AS Phone_Numbers
-      FROM Employee e
-      LEFT JOIN Emp_Phone p ON e.Emp_ID = p.Emp_ID
-      GROUP BY e.Emp_ID
-    `);
-    res.json(rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
 
 // Get all customers
 app.get("/api/customers", async (req, res) => {
@@ -702,6 +674,160 @@ app.get("/api/bills/:billNo", async (req, res) => {
     res.json({
       bill: billHeader[0],
       items: billItems
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Add these API endpoints to your Express server file (after your existing routes)
+
+// Update employee salary
+app.put("/api/employees/:empId/salary", async (req, res) => {
+  const { salary } = req.body;
+  const empId = parseInt(req.params.empId);
+  
+  if (!empId || salary === undefined) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+  
+  try {
+    // Update employee salary
+    const [result] = await pool.query(
+      "UPDATE Employee SET Salary = ? WHERE Emp_ID = ?",
+      [salary, empId]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Employee not found" });
+    }
+    
+    res.status(200).json({ 
+      message: "Salary updated successfully",
+      empId,
+      newSalary: salary
+    });
+  } catch (err) {
+    console.error("Error updating salary:", err);
+    res.status(500).json({ error: "Error updating salary" });
+  }
+});
+
+// Add new employee with phone numbers
+app.post("/api/employees", async (req, res) => {
+  const { Emp_Name, Gender, Age, Start_Date, Role, Salary, PhoneNumbers } = req.body;
+  
+  if (!Emp_Name || !Gender || !Role || Salary === undefined) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+  
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    
+    // Insert employee
+    const [result] = await connection.query(
+      "INSERT INTO Employee (Emp_Name, Gender, Age, Start_Date, Role, Salary) VALUES (?, ?, ?, ?, ?, ?)",
+      [Emp_Name, Gender, Age || null, Start_Date || new Date(), Role, Salary]
+    );
+    
+    const empId = result.insertId;
+    
+    // Insert phone numbers if provided
+    if (PhoneNumbers && PhoneNumbers.length > 0) {
+      for (const phone of PhoneNumbers) {
+        await connection.query(
+          "INSERT INTO Emp_Phone (Emp_ID, Emp_phone) VALUES (?, ?)",
+          [empId, phone]
+        );
+      }
+    }
+    
+    await connection.commit();
+    res.status(201).json({ 
+      message: "Employee added successfully", 
+      empId
+    });
+  } catch (err) {
+    await connection.rollback();
+    console.error("Error adding employee:", err);
+    res.status(500).json({ error: "Error adding employee" });
+  } finally {
+    connection.release();
+  }
+});
+
+// Delete employee
+app.delete("/api/employees/:empId", async (req, res) => {
+  const empId = parseInt(req.params.empId);
+  
+  if (!empId) {
+    return res.status(400).json({ error: "Missing employee ID" });
+  }
+  
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    
+    // Delete phone records first (due to foreign key constraint)
+    await connection.query(
+      "DELETE FROM Emp_Phone WHERE Emp_ID = ?",
+      [empId]
+    );
+    
+    // Delete employee
+    const [result] = await connection.query(
+      "DELETE FROM Employee WHERE Emp_ID = ?",
+      [empId]
+    );
+    
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: "Employee not found" });
+    }
+    
+    await connection.commit();
+    res.status(200).json({ 
+      message: "Employee deleted successfully",
+      empId
+    });
+  } catch (err) {
+    await connection.rollback();
+    console.error("Error deleting employee:", err);
+    res.status(500).json({ error: "Error deleting employee" });
+  } finally {
+    connection.release();
+  }
+});
+
+// Get single employee details with phone numbers
+app.get("/api/employees/:empId", async (req, res) => {
+  const empId = parseInt(req.params.empId);
+  
+  try {
+    const [employee] = await pool.query(`
+      SELECT e.Emp_ID, e.Emp_Name, e.Gender, e.Age, e.Start_Date, e.Role, e.Salary
+      FROM Employee e
+      WHERE e.Emp_ID = ?
+    `, [empId]);
+    
+    if (employee.length === 0) {
+      return res.status(404).json({ error: "Employee not found" });
+    }
+    
+    // Get phone numbers
+    const [phones] = await pool.query(`
+      SELECT Emp_phone
+      FROM Emp_Phone
+      WHERE Emp_ID = ?
+    `, [empId]);
+    
+    const phoneNumbers = phones.map(p => p.Emp_phone);
+    
+    res.json({
+      ...employee[0],
+      PhoneNumbers: phoneNumbers
     });
   } catch (err) {
     console.error(err);
