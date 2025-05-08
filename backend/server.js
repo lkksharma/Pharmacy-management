@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Database Connection
+
 const dbConfig = {
   host: "127.0.0.1",
   user: "root",
@@ -15,15 +15,15 @@ const dbConfig = {
   database: "pdb",
 };
 
-// Create connection pool
+
 const pool = mysql.createPool(dbConfig);
 
-// Initialize database and tables (normalized schema)
+
 async function initDatabase() {
   try {
     const connection = await pool.getConnection();
 
-    // Customer: split Address into area & city
+    
     await connection.query(`
       CREATE TABLE IF NOT EXISTS Customer (
         Cust_ID INT AUTO_INCREMENT PRIMARY KEY,
@@ -36,7 +36,7 @@ async function initDatabase() {
       );
     `);
 
-    // Employee: remove phone, salary stays
+    
     await connection.query(`
       CREATE TABLE IF NOT EXISTS Employee (
         Emp_ID INT AUTO_INCREMENT PRIMARY KEY,
@@ -49,7 +49,7 @@ async function initDatabase() {
       );
     `);
 
-    // Employee phone in separate table
+    
     await connection.query(`
       CREATE TABLE IF NOT EXISTS Emp_Phone (
         Emp_ID INT,
@@ -59,7 +59,7 @@ async function initDatabase() {
       );
     `);
 
-    // Medicine unchanged
+    
     await connection.query(`
       CREATE TABLE IF NOT EXISTS Medicine (
       Med_ID INT AUTO_INCREMENT PRIMARY KEY,
@@ -70,7 +70,7 @@ async function initDatabase() {
       );
     `);
 
-    // Stock: composite key (Med_ID, Batch_no)
+    
     await connection.query(`
       CREATE TABLE IF NOT EXISTS Stock (
         Med_ID INT,
@@ -88,17 +88,17 @@ async function initDatabase() {
     
 
 
-    // Company unchanged
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS Company (
-        Name VARCHAR(100) PRIMARY KEY,
-        Country VARCHAR(50),
-        Phone VARCHAR(15),
-        Email VARCHAR(100)
-      );
-    `);
+    
+    // await connection.query(`
+    //   CREATE TABLE IF NOT EXISTS Company (
+    //     Name VARCHAR(100) PRIMARY KEY,
+    //     Country VARCHAR(50),
+    //     Phone VARCHAR(15),
+    //     Email VARCHAR(100)
+    //   );
+    // `);
 
-    // Disposal: Med_ID as PK
+    
     await connection.query(`
       CREATE TABLE IF NOT EXISTS Disposal (
         Med_ID INT PRIMARY KEY,
@@ -107,7 +107,7 @@ async function initDatabase() {
       );
     `);
 
-    // Bill unchanged
+    
     await connection.query(`
       CREATE TABLE IF NOT EXISTS Bill (
         Bill_no INT AUTO_INCREMENT PRIMARY KEY,
@@ -120,7 +120,7 @@ async function initDatabase() {
       );
     `);
 
-    // Bill_details unchanged
+    
     await connection.query(`
       CREATE TABLE IF NOT EXISTS Bill_details (
         Bill_no INT,
@@ -132,7 +132,7 @@ async function initDatabase() {
       );
     `);
 
-    // Sample data (adjusted)
+    
     await connection.query(`
       INSERT IGNORE INTO Medicine (Med_ID, Med_Name, Manufacturer, Expiry_date, cost_price)
       VALUES
@@ -162,7 +162,7 @@ async function initDatabase() {
         (2,'0987654321');
     `);
 
-    // Function get_employee_salary
+    
     await connection.query(`DROP FUNCTION IF EXISTS get_employee_salary;`);
     await connection.query(`
       CREATE FUNCTION get_employee_salary(empId INT)
@@ -176,7 +176,7 @@ async function initDatabase() {
       END;
     `);
 
-    // Trigger for expired stock
+    
     await connection.query(`DROP TRIGGER IF EXISTS dispose_expired_stock;`);
     await connection.query(`
       CREATE TRIGGER dispose_expired_stock
@@ -191,7 +191,7 @@ async function initDatabase() {
       END;
     `);
 
-    // Stored procedure: updated for area & city
+    
     await connection.query(`DROP PROCEDURE IF EXISTS place_order_full;`);
     await connection.query(`
       CREATE PROCEDURE place_order_full(
@@ -252,9 +252,9 @@ async function initDatabase() {
 
 initDatabase();
 
-// API Routes
 
-// Get all medicines
+
+
 app.get("/api/medicines", async (req, res) => {
   try {
     const [rows] = await pool.query(`
@@ -270,8 +270,8 @@ app.get("/api/medicines", async (req, res) => {
   }
 });
 
-// Get expired medicines
-// Get expired medicines
+
+
 app.get("/api/medicines/expired", async (req, res) => {
   try {
     const today = new Date().toISOString().split("T")[0];
@@ -290,7 +290,7 @@ app.get("/api/medicines/expired", async (req, res) => {
 });
 
 
-// Check medicine availability
+
 app.get("/api/medicines/:medId", async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -303,7 +303,7 @@ app.get("/api/medicines/:medId", async (req, res) => {
       [req.params.medId]
     );
     if (rows.length === 0) return res.status(404).json({ error: "Medicine not found" });
-    res.json(rows[0]); // Return only the first result since React component expects a single object
+    res.json(rows[0]); 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -311,7 +311,7 @@ app.get("/api/medicines/:medId", async (req, res) => {
 });
 
 
-// Add new medicine
+
 app.post("/api/medicines", async (req, res) => {
   const { Med_Name, Manufacturer, Expiry_date, cost_price, Batch_no, Quantity, Category, Batch_price } = req.body;
   const connection = await pool.getConnection();
@@ -337,7 +337,7 @@ app.post("/api/medicines", async (req, res) => {
   }
 });
 
-// Place order
+
 app.post("/api/createOrder", async (req, res) => {
   const { customerDetails, orderItems, employeeId } = req.body;
   const connection = await pool.getConnection();
@@ -345,12 +345,12 @@ app.post("/api/createOrder", async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Split address
+    
     const addressParts = customerDetails.Address ? customerDetails.Address.split(',') : ['', ''];
     const area = addressParts[0]?.trim() || '';
     const city = addressParts.length > 1 ? addressParts[1].trim() : '';
 
-    // Call the stored procedure
+    
     await connection.query(
       `CALL place_order_full(?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -378,7 +378,7 @@ app.post("/api/createOrder", async (req, res) => {
 
 
 
-// Get all customers
+
 app.get("/api/customers", async (req, res) => {
   try {
     const [rows] = await pool.query(`
@@ -394,7 +394,7 @@ app.get("/api/customers", async (req, res) => {
   }
 });
 
-// Get bills with customer and employee details
+
 app.get("/api/bills", async (req, res) => {
   try {
     const [rows] = await pool.query(`
@@ -412,9 +412,9 @@ app.get("/api/bills", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-// Add these API endpoints to your Express server file
 
-// Update medicine stock (add or dispose)
+
+
 app.put("/api/medicines/:medId/stock", async (req, res) => {
   const { Batch_no, Quantity, action } = req.body;
   const medId = parseInt(req.params.medId);
@@ -432,7 +432,7 @@ app.put("/api/medicines/:medId/stock", async (req, res) => {
   try {
     await connection.beginTransaction();
     
-    // First, check if medicine exists and get current quantity
+    
     const [medResult] = await connection.query(
       "SELECT s.Quantity FROM Stock s WHERE s.Med_ID = ? AND s.Batch_no = ?",
       [medId, Batch_no]
@@ -450,11 +450,11 @@ app.put("/api/medicines/:medId/stock", async (req, res) => {
       return res.status(400).json({ error: "Cannot dispose more than available stock" });
     }
     
-    // Update stock quantity
+    
     let newQuantity;
     if (action === 'add') {
       newQuantity = currentQuantity + parseInt(Quantity);
-    } else { // dispose
+    } else { 
       newQuantity = currentQuantity - parseInt(Quantity);
     }
     
@@ -463,16 +463,16 @@ app.put("/api/medicines/:medId/stock", async (req, res) => {
       [newQuantity, medId, Batch_no]
     );
     
-    // If disposing, add to Disposal table
+    
     if (action === 'dispose') {
-      // Check if exists in Disposal table
+      
       const [disposalResult] = await connection.query(
         "SELECT * FROM Disposal WHERE Med_ID = ?",
         [medId]
       );
       
       if (disposalResult.length > 0) {
-        // Update existing disposal record
+        
         await connection.query(
           "UPDATE Disposal SET Quantity = Quantity + ? WHERE Med_ID = ?",
           [parseInt(Quantity), medId]
@@ -538,7 +538,7 @@ app.get("/api/medicines/expired", async (req, res) => {
   }
 });
 
-// Check medicine availability with batch info
+//
 app.get("/api/medicines/:medId", async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -552,7 +552,7 @@ app.get("/api/medicines/:medId", async (req, res) => {
     );
     if (rows.length === 0) return res.status(404).json({ error: "Medicine not found" });
     
-    // If multiple batches exist, return them all
+    
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -560,11 +560,11 @@ app.get("/api/medicines/:medId", async (req, res) => {
   }
 });
 
-// Add new medicine with batch info
+
 app.post("/api/medicines", async (req, res) => {
   const { Med_Name, Manufacturer, Expiry_date, cost_price, Batch_no, Quantity, Category, Batch_price } = req.body;
   
-  // Validate required fields
+  
   if (!Med_Name || !Manufacturer || !Expiry_date || !cost_price || 
       !Batch_no || !Quantity || !Category || !Batch_price) {
     return res.status(400).json({ error: "All fields are required" });
@@ -574,7 +574,7 @@ app.post("/api/medicines", async (req, res) => {
   try {
     await connection.beginTransaction();
     
-    // First check if medicine with this name already exists
+    
     const [existingMed] = await connection.query(
       "SELECT Med_ID FROM Medicine WHERE Med_Name = ?",
       [Med_Name]
@@ -583,16 +583,16 @@ app.post("/api/medicines", async (req, res) => {
     let medId;
     
     if (existingMed.length > 0) {
-      // Use existing medicine ID
+      
       medId = existingMed[0].Med_ID;
       
-      // Update medicine details if needed
+      
       await connection.query(
         "UPDATE Medicine SET Manufacturer = ?, Expiry_date = ?, cost_price = ? WHERE Med_ID = ?",
         [Manufacturer, Expiry_date, cost_price, medId]
       );
     } else {
-      // Insert new medicine
+      
       const [result] = await connection.query(
         "INSERT INTO Medicine (Med_Name, Manufacturer, Expiry_date, cost_price) VALUES (?, ?, ?, ?)",
         [Med_Name, Manufacturer, Expiry_date, cost_price]
@@ -600,20 +600,20 @@ app.post("/api/medicines", async (req, res) => {
       medId = result.insertId;
     }
     
-    // Check if this batch already exists
+    
     const [existingBatch] = await connection.query(
       "SELECT * FROM Stock WHERE Med_ID = ? AND Batch_no = ?",
       [medId, Batch_no]
     );
     
     if (existingBatch.length > 0) {
-      // Update existing batch
+      
       await connection.query(
         "UPDATE Stock SET Quantity = Quantity + ?, Exp_date = ?, Category = ?, Batch_price = ? WHERE Med_ID = ? AND Batch_no = ?",
         [Quantity, Expiry_date, Category, Batch_price, medId, Batch_no]
       );
     } else {
-      // Add new batch
+      
       await connection.query(
         "INSERT INTO Stock (Med_ID, Batch_no, Med_Name, Quantity, Exp_date, Category, Batch_price) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [medId, Batch_no, Med_Name, Quantity, Expiry_date, Category, Batch_price]
@@ -635,7 +635,7 @@ app.post("/api/medicines", async (req, res) => {
   }
 });
 
-// Get disposal information
+
 app.get("/api/disposal", async (req, res) => {
   try {
     const [rows] = await pool.query(`
@@ -649,10 +649,10 @@ app.get("/api/disposal", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-// Get bill details
+
 app.get("/api/bills/:billNo", async (req, res) => {
   try {
-    // Get bill header
+    
     const [billHeader] = await pool.query(`
       SELECT b.Bill_no, b.Total_amount, b.Bill_date,
              c.Name AS Customer_Name, c.Phone AS Customer_Phone,
@@ -667,7 +667,7 @@ app.get("/api/bills/:billNo", async (req, res) => {
       return res.status(404).json({ error: "Bill not found" });
     }
     
-    // Get bill items
+    
     const [billItems] = await pool.query(`
       SELECT bd.Med_ID, m.Med_Name, bd.Quantity, m.cost_price,
              (bd.Quantity * m.cost_price) AS Subtotal
@@ -686,9 +686,9 @@ app.get("/api/bills/:billNo", async (req, res) => {
   }
 });
 
-// Add these API endpoints to your Express server file (after your existing routes)
 
-// Update employee salary
+
+
 app.put("/api/employees/:empId/salary", async (req, res) => {
   const { salary } = req.body;
   const empId = parseInt(req.params.empId);
@@ -698,7 +698,7 @@ app.put("/api/employees/:empId/salary", async (req, res) => {
   }
   
   try {
-    // Update employee salary
+    
     const [result] = await pool.query(
       "UPDATE Employee SET Salary = ? WHERE Emp_ID = ?",
       [salary, empId]
@@ -719,7 +719,7 @@ app.put("/api/employees/:empId/salary", async (req, res) => {
   }
 });
 
-// Add new employee with phone numbers
+
 app.post("/api/employees", async (req, res) => {
   const { Emp_Name, Gender, Age, Start_Date, Role, Salary, PhoneNumbers } = req.body;
   
@@ -731,7 +731,7 @@ app.post("/api/employees", async (req, res) => {
   try {
     await connection.beginTransaction();
     
-    // Insert employee
+    
     const [result] = await connection.query(
       "INSERT INTO Employee (Emp_Name, Gender, Age, Start_Date, Role, Salary) VALUES (?, ?, ?, ?, ?, ?)",
       [Emp_Name, Gender, Age || null, Start_Date || new Date(), Role, Salary]
@@ -739,7 +739,7 @@ app.post("/api/employees", async (req, res) => {
     
     const empId = result.insertId;
     
-    // Insert phone numbers if provided
+    
     if (PhoneNumbers && PhoneNumbers.length > 0) {
       for (const phone of PhoneNumbers) {
         await connection.query(
@@ -763,7 +763,7 @@ app.post("/api/employees", async (req, res) => {
   }
 });
 
-// Delete employee
+
 app.delete("/api/employees/:empId", async (req, res) => {
   const empId = parseInt(req.params.empId);
   
@@ -775,13 +775,13 @@ app.delete("/api/employees/:empId", async (req, res) => {
   try {
     await connection.beginTransaction();
     
-    // Delete phone records first (due to foreign key constraint)
+    
     await connection.query(
       "DELETE FROM Emp_Phone WHERE Emp_ID = ?",
       [empId]
     );
     
-    // Delete employee
+    
     const [result] = await connection.query(
       "DELETE FROM Employee WHERE Emp_ID = ?",
       [empId]
@@ -806,41 +806,7 @@ app.delete("/api/employees/:empId", async (req, res) => {
   }
 });
 
-// Get single employee details with phone numbers
-app.get("/api/employees/:empId", async (req, res) => {
-  const empId = parseInt(req.params.empId);
-  
-  try {
-    const [employee] = await pool.query(`
-      SELECT e.Emp_ID, e.Emp_Name, e.Gender, e.Age, e.Start_Date, e.Role, e.Salary
-      FROM Employee e
-      WHERE e.Emp_ID = ?
-    `, [empId]);
-    
-    if (employee.length === 0) {
-      return res.status(404).json({ error: "Employee not found" });
-    }
-    
-    // Get phone numbers
-    const [phones] = await pool.query(`
-      SELECT Emp_phone
-      FROM Emp_Phone
-      WHERE Emp_ID = ?
-    `, [empId]);
-    
-    const phoneNumbers = phones.map(p => p.Emp_phone);
-    
-    res.json({
-      ...employee[0],
-      PhoneNumbers: phoneNumbers
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
 
-// Get all employees with phone numbers
 app.get("/api/employees", async (req, res) => {
   try {
     const [employees] = await pool.query(`
@@ -858,7 +824,7 @@ app.get("/api/employees", async (req, res) => {
   }
 });
 
-// Get single employee with salary
+
 app.get("/api/employees/:empId", async (req, res) => {
   try {
     const [employee] = await pool.query(`
@@ -882,6 +848,6 @@ app.get("/api/employees/:empId", async (req, res) => {
   }
 });
 
-// Server start
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
