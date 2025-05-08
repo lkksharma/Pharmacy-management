@@ -61,13 +61,15 @@ export default function SalaryEditor() {
       return;
     }
     
-    const employee = employees.find(emp => emp.Emp_ID === empId);
-    setSelectedEmployee(employee);
-    
-    // Get employee salary using the function
-    const employeeSalary = await fetchEmployeeSalary(empId);
-    if (employeeSalary !== null) {
-      setSalary(employeeSalary);
+    try {
+      const response = await fetch(`http://localhost:3001/api/employees/${empId}`);
+      if (!response.ok) throw new Error('Failed to fetch employee details');
+      
+      const employee = await response.json();
+      setSelectedEmployee(employee);
+      setSalary(employee.Salary);
+    } catch (err) {
+      setError('Error fetching employee details: ' + err.message);
     }
   };
 

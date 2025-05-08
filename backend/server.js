@@ -85,6 +85,9 @@ async function initDatabase() {
       );
     `);
 
+    
+
+
     // Company unchanged
     await connection.query(`
       CREATE TABLE IF NOT EXISTS Company (
@@ -237,6 +240,8 @@ async function initDatabase() {
         COMMIT;
       END;
     `);
+
+      
 
     connection.release();
     console.log("Database initialized (normalized)");
@@ -839,13 +844,38 @@ app.get("/api/employees/:empId", async (req, res) => {
 app.get("/api/employees", async (req, res) => {
   try {
     const [employees] = await pool.query(`
-      SELECT e.Emp_ID, e.Emp_Name, e.Gender, e.Age, e.Start_Date, e.Role, e.Salary,
+      SELECT e.Emp_ID, e.Emp_Name, e.Gender, e.Age, e.Start_Date, e.Role,
+             get_employee_salary(e.Emp_ID) as Salary,
              GROUP_CONCAT(ep.Emp_phone) as Phone_Numbers
       FROM Employee e
       LEFT JOIN Emp_Phone ep ON e.Emp_ID = ep.Emp_ID
       GROUP BY e.Emp_ID
     `);
     res.json(employees);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Get single employee with salary
+app.get("/api/employees/:empId", async (req, res) => {
+  try {
+    const [employee] = await pool.query(`
+      SELECT e.Emp_ID, e.Emp_Name, e.Gender, e.Age, e.Start_Date, e.Role,
+             get_employee_salary(e.Emp_ID) as Salary,
+             GROUP_CONCAT(ep.Emp_phone) as Phone_Numbers
+      FROM Employee e
+      LEFT JOIN Emp_Phone ep ON e.Emp_ID = ep.Emp_ID
+      WHERE e.Emp_ID = ?
+      GROUP BY e.Emp_ID
+    `, [req.params.empId]);
+
+    if (employee.length === 0) {
+      return res.status(404).json({ error: "Employee not found" });
+    }
+
+    res.json(employee[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
