@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Header from '../components/Header';
 
 function HomePage() {
   const navigate = useNavigate();
@@ -23,16 +24,11 @@ function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Navigation items
-  const navItems = [
-    { title: 'Home', path: '/' },
-    { title: 'Place Order', path: '/order' },
-    { title: 'Inventory Management', path: '/inventory' },
-    { title: 'Appraisal', path: '/appraisal' }
-  ];
-
   return (
     <div className="main-container">
+      {/* Include the updated Header component */}
+      {/* <Header /> */}
+      
       {/* Background image slider with overlay */}
       <div 
         className="bg-image-container"
@@ -43,22 +39,6 @@ function HomePage() {
       >
         <div className="overlay"></div>
       </div>
-
-      {/* Navigation header */}
-      <header className="navbar">
-        {/* <div className="navbar-brand">Pharmacy Management System</div> */}
-        <nav className="navbar-nav">
-          {navItems.map((item, index) => (
-            <button 
-              key={index}
-              className="nav-item" 
-              onClick={() => navigate(item.path)}
-            >
-              {item.title}
-            </button>
-          ))}
-        </nav>
-      </header>
 
       {/* Main content */}
       <div className="content">
@@ -87,4 +67,4 @@ function HomePage() {
   );
 }
 
-export default HomePage;
+export default HomePage

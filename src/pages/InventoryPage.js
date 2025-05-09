@@ -236,12 +236,14 @@ function InventoryPage() {
           <button 
             className={`btn me-2 ${activeTab === 'available' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('available')}
+            style = {{margin:'10px'}}
           >
             Available Medicines
           </button>
           <button 
             className={`btn me-2 ${activeTab === 'expired' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('expired')}
+            style = {{margin:'10px'}}
           >
             Expired Medicines
           </button>
@@ -254,6 +256,7 @@ function InventoryPage() {
               setShowAddForm(!showAddForm);
               setShowUpdateForm(false);
             }}
+            style = {{margin:'10px'}}
           >
             {showAddForm ? 'Cancel' : 'Add New Medicine'}
           </button>
@@ -265,6 +268,7 @@ function InventoryPage() {
               setShowAddForm(false);
               setSelectedMedicine(null);
             }}
+            style = {{margin:'10px'}}
           >
             {showUpdateForm ? 'Cancel' : 'Update Stock'}
           </button>
@@ -509,7 +513,7 @@ function InventoryPage() {
                           <td>{med.Quantity}</td>
                           <td>{getStockStatus(med.Quantity)}</td>
                           <td>{formatDate(med.Exp_date)}</td>
-                          <td>${med.cost_price}</td>
+                          <td>Rs.{med.cost_price}</td>
                           <td>
                             <button
                               className="btn btn-sm btn-primary"
@@ -556,7 +560,7 @@ function InventoryPage() {
                           <td>{med.Category}</td>
                           <td>{med.Quantity}</td>
                           <td>{formatDate(med.Exp_date)}</td>
-                          <td>${med.cost_price}</td>
+                          <td>Rs.{med.cost_price}</td>
                           <td>
                             <button
                               className="btn btn-sm btn-warning"

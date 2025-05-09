@@ -301,7 +301,7 @@ function OrderPage() {
             <option value="">-- Select Medicine --</option>
             {medicines.map(med => (
               <option key={med.Med_ID} value={med.Med_ID}>
-                {med.Med_Name} - ${med.cost_price} (Stock: {med.Quantity})
+                {med.Med_Name} - Rs.{med.cost_price} (Stock: {med.Quantity})
               </option>
             ))}
           </select>
@@ -344,9 +344,9 @@ function OrderPage() {
               {selectedMedicines.map(med => (
                 <tr key={med.Med_ID}>
                   <td>{med.Med_Name}</td>
-                  <td>${med.cost_price}</td>
+                  <td>Rs.{med.cost_price}</td>
                   <td>{med.Quantity}</td>
-                  <td>${(med.cost_price * med.Quantity).toFixed(2)}</td>
+                  <td>Rs.{(med.cost_price * med.Quantity).toFixed(2)}</td>
                   <td>
                     <button 
                       onClick={() => removeMedicineFromOrder(med.Med_ID)}
@@ -366,7 +366,7 @@ function OrderPage() {
               ))}
               <tr style={{ fontWeight: 'bold' }}>
                 <td colSpan="3" style={{ textAlign: 'right' }}>Total:</td>
-                <td>${calculateTotal()}</td>
+                <td>Rs.{calculateTotal()}</td>
                 <td></td>
               </tr>
             </tbody>
