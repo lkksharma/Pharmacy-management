@@ -1,7 +1,7 @@
 // src/api.js
 import axios from 'axios';
 
-const baseURL = 'http://localhost:3001/api';
+const baseURL = 'http://localhost:3006/api';
 
 export const api = {
   // Medicine-related endpoints

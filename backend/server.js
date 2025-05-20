@@ -8,15 +8,24 @@ app.use(cors());
 app.use(bodyParser.json());
 
 
-const dbConfig = {
-  host: "127.0.0.1",
-  user: "root",
-  password: "password",
-  database: "pdb",
-};
+// const dbConfig = {
+//   host: "127.0.0.1",
+//   user: "root",
+//   password: "password",
+//   database: "pdb",
+// };
+// const pool = mysql.createPool(dbConfig);
+const pool = mysql.createPool({
+  host: '127.0.0.1',
+  user: 'root',         
+  password: 'password', 
+  database: 'pdb',
+  port: 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
 
-
-const pool = mysql.createPool(dbConfig);
 
 
 async function initDatabase() {
@@ -849,5 +858,5 @@ app.get("/api/employees/:empId", async (req, res) => {
 });
 
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3006;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
