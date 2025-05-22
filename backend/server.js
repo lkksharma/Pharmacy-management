@@ -8,13 +8,6 @@ app.use(cors());
 app.use(bodyParser.json());
 
 
-// const dbConfig = {
-//   host: "127.0.0.1",
-//   user: "root",
-//   password: "password",
-//   database: "pdb",
-// };
-// const pool = mysql.createPool(dbConfig);
 const pool = mysql.createPool({
   host: '127.0.0.1',
   user: 'root',         
@@ -96,16 +89,6 @@ async function initDatabase() {
 
     
 
-
-    
-    // await connection.query(`
-    //   CREATE TABLE IF NOT EXISTS Company (
-    //     Name VARCHAR(100) PRIMARY KEY,
-    //     Country VARCHAR(50),
-    //     Phone VARCHAR(15),
-    //     Email VARCHAR(100)
-    //   );
-    // `);
 
     
     await connection.query(`

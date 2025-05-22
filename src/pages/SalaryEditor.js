@@ -10,7 +10,7 @@ export default function SalaryEditor() {
   const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   
-  // New employee form state
+ 
   const [newEmployee, setNewEmployee] = useState({
     Emp_Name: '',
     Gender: 'Male',
@@ -20,7 +20,7 @@ export default function SalaryEditor() {
     PhoneNumbers: ['']
   });
 
-  // Load employees on component mount
+ 
   useEffect(() => {
     fetchEmployees();
   }, []);
@@ -28,7 +28,7 @@ export default function SalaryEditor() {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/employees');
+      const response = await fetch('http://localhost:3006/api/employees');
       if (!response.ok) throw new Error('Failed to fetch employees');
       
       const data = await response.json();
@@ -42,7 +42,7 @@ export default function SalaryEditor() {
 
   const fetchEmployeeSalary = async (empId) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/employee/${empId}/salary`);
+      const response = await fetch(`http://localhost:3006/api/employee/${empId}/salary`);
       if (!response.ok) throw new Error('Failed to fetch salary');
       
       const data = await response.json();
@@ -62,7 +62,7 @@ export default function SalaryEditor() {
     }
     
     try {
-      const response = await fetch(`http://localhost:3001/api/employees/${empId}`);
+      const response = await fetch(`http://localhost:3006/api/employees/${empId}`);
       if (!response.ok) throw new Error('Failed to fetch employee details');
       
       const employee = await response.json();
@@ -84,7 +84,7 @@ export default function SalaryEditor() {
     }
     
     try {
-      const response = await fetch(`http://localhost:3001/api/employees/${selectedEmployee.Emp_ID}/salary`, {
+      const response = await fetch(`http://localhost:3006/api/employees/${selectedEmployee.Emp_ID}/salary`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -97,10 +97,10 @@ export default function SalaryEditor() {
       const data = await response.json();
       setMessage(`Salary updated successfully for ${selectedEmployee.Emp_Name}`);
       
-      // Refresh employees list
+     
       fetchEmployees();
       
-      // Clear error if any
+     
       setError('');
     } catch (err) {
       setError('Error updating salary: ' + err.message);
@@ -118,7 +118,7 @@ export default function SalaryEditor() {
     }
     
     try {
-      const response = await fetch(`http://localhost:3001/api/employees/${selectedEmployee.Emp_ID}`, {
+      const response = await fetch(`http://localhost:3006/api/employees/${selectedEmployee.Emp_ID}`, {
         method: 'DELETE',
       });
       
@@ -127,21 +127,21 @@ export default function SalaryEditor() {
       const data = await response.json();
       setMessage(`Employee ${selectedEmployee.Emp_Name} deleted successfully`);
       
-      // Reset selected employee
+     
       setSelectedEmployee(null);
       setSalary('');
       
-      // Refresh employees list
+     
       fetchEmployees();
       
-      // Clear error if any
+     
       setError('');
     } catch (err) {
       setError('Error deleting employee: ' + err.message);
     }
   };
 
-  // Handle new employee form changes
+ 
   const handleNewEmployeeChange = (e) => {
     const { name, value } = e.target;
     setNewEmployee({
@@ -150,7 +150,7 @@ export default function SalaryEditor() {
     });
   };
 
-  // Handle phone number changes
+ 
   const handlePhoneChange = (index, value) => {
     const updatedPhones = [...newEmployee.PhoneNumbers];
     updatedPhones[index] = value;
@@ -160,7 +160,7 @@ export default function SalaryEditor() {
     });
   };
 
-  // Add phone number field
+ 
   const addPhoneField = () => {
     setNewEmployee({
       ...newEmployee,
@@ -168,7 +168,7 @@ export default function SalaryEditor() {
     });
   };
 
-  // Remove phone number field
+ 
   const removePhoneField = (index) => {
     const updatedPhones = [...newEmployee.PhoneNumbers];
     updatedPhones.splice(index, 1);
@@ -178,15 +178,15 @@ export default function SalaryEditor() {
     });
   };
 
-  // Submit new employee
+ 
   const addEmployee = async (e) => {
     e.preventDefault();
     
-    // Filter out empty phone numbers
+   
     const phoneNumbers = newEmployee.PhoneNumbers.filter(phone => phone.trim() !== '');
     
     try {
-      const response = await fetch('http://localhost:3001/api/employees', {
+      const response = await fetch('http://localhost:3006/api/employees', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -204,7 +204,7 @@ export default function SalaryEditor() {
       const data = await response.json();
       setMessage(`Employee ${newEmployee.Emp_Name} added successfully`);
       
-      // Reset form
+     
       setNewEmployee({
         Emp_Name: '',
         Gender: 'Male',
@@ -214,13 +214,13 @@ export default function SalaryEditor() {
         PhoneNumbers: ['']
       });
       
-      // Hide form
+     
       setShowAddForm(false);
       
-      // Refresh employees list
+     
       fetchEmployees();
       
-      // Clear error if any
+     
       setError('');
     } catch (err) {
       setError('Error adding employee: ' + err.message);
